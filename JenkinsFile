@@ -1,0 +1,40 @@
+pipeline {
+    agent any
+    tools {
+        terraform 'terraform15'
+    }
+    environment {
+    SVC_ACCOUNT_KEY = credentials('cft-seed-50a5')#'terraform-auth-1')
+   }
+   stages{
+        stage('Checkout') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], browser: [$class: 'GithubWeb', repoUrl: 'https://github.com/GCP-CI-CD/convatec-terraform-ci-cd'], extensions: [], userRemoteConfigs: [[credentialsId: 'github-integration-auth', url: 'https://github.com/GCP-CI-CD/convatec-terraform-ci-cd.git']]])
+                sh 'mkdir -p creds'
+                sh 'echo $SVC_ACCOUNT_KEY'
+                // sh 'echo $SVC_ACCOUNT_KEY | base64 -d > ./creds/serviceaccount.json'
+            }
+        }
+
+        stage('TF Plan') {
+             steps {
+               sh 'terraform init'
+               sh 'terraform plan -out myplan'
+            }
+        }
+        stage('Approval') {
+            steps {
+                script {
+                    def userInput = input(id: 'confirm', message: 'Apply Terraform?', parameters: [ [$class: 'BooleanParameterDefinition', defaultValue: false, description: 'Apply terraform', name: 'confirm'] ])
+                }
+            }
+        }
+
+        stage('TF Apply') {
+            steps {
+                sh 'terraform apply -input=false myplan'
+
+            }
+        }
+   }
+}
